@@ -1,0 +1,12 @@
+sequenceDiagram
+  participant Q as Quantum UI
+  participant W as Location Gateway (WS)
+  participant A as Query API
+  participant B as Event Bus
+  Q->>A: GET /v1/locationtracking/latest (snapshot, cursor)
+  Q->>W: connect (JWT) + subscribe {clientId, populationFilter, types}
+  W->>W: authorize scope (function code + population)
+  B-->>W: location.shared.v1 (consumer per gateway node)
+  W->>W: filter to subscribed scope, coalesce latest per user
+  W-->>Q: delta {type, userId, lat, lon, capturedAt}
+  Note over Q,W: on reconnect: GET /latest?since=cursor, then resubscribe

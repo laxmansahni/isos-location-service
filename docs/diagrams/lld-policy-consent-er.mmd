@@ -1,0 +1,68 @@
+erDiagram
+  CLIENT_LOCATION_POLICY ||--o{ USER_LOCATION_CONSENT : governs
+  USER_LOCATION_CONSENT ||--o{ USER_SHARING_PREFERENCE : has
+  USER_SHARING_PREFERENCE ||--o{ SCHEDULE_WINDOW : has
+  USER_LOCATION_CONSENT ||--o{ DEVICE_SESSION : has
+  USER_LOCATION_CONSENT ||--o{ EVENT_WINDOW_ACTIVATION : has
+  CLIENT_LOCATION_POLICY {
+    uuid client_id PK
+    bool sharing_enabled
+    bool type_always
+    bool type_schedule
+    bool type_active_travel
+    bool type_event_window
+    bool allow_user_view_history
+    int  retention_days "default 14, >= longest range"
+    int  event_window_minutes "default 60"
+    ts   visible_from "fence, ADR-005"
+    int  version
+    ts   updated_at
+    string updated_by
+    string data_region
+  }
+  USER_LOCATION_CONSENT {
+    string user_id PK
+    uuid client_id PK
+    string status "GRANTED|REVOKED"
+    string disclosure_version
+    ts granted_at
+    ts revoked_at
+    string user_region
+    ts visible_from "fence, ADR-005"
+  }
+  USER_SHARING_PREFERENCE {
+    string user_id PK
+    uuid client_id PK
+    string primary_type "ALWAYS|SCHEDULE|ACTIVE_TRAVEL"
+    string home_timezone "IANA, nullable"
+  }
+  SCHEDULE_WINDOW {
+    uuid id PK
+    string user_id FK
+    uuid client_id FK
+    smallint day_of_week
+    time start_time
+    time end_time "may be before start_time to cross midnight"
+  }
+  EVENT_WINDOW_ACTIVATION {
+    uuid id PK
+    string user_id
+    uuid client_id
+    string trigger_type "AEC|SPECIAL_ADVISORY"
+    string source_ref "aecId|alertId"
+    ts starts_at
+    ts expires_at
+  }
+  DEVICE_SESSION {
+    uuid id PK
+    string user_id
+    uuid client_id
+    string device_id
+    string platform
+    string state "ACTIVE|SUSPENDED_OS_PERMISSION|ENDED"
+    string os_permission "ALWAYS|WHEN_IN_USE|DENIED|OFF"
+    bool precise_location
+    string last_timezone "IANA"
+    ts last_seen_at
+    ts lease_expires_at
+  }

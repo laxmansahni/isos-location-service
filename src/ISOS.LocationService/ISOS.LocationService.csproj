@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UserSecretsId>b35e1638-4253-4bc0-9c67-f393abfaf993</UserSecretsId>
+        <!-- XML comments feed the OpenAPI document. 1591: public members without comments are fine. -->
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);1591</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Database\Migrations\*.sql" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Local credentials and their template must never be published with the app. -->
+        <Content Remove="appsettings.Local.json" />
+        <Content Remove="appsettings.Local.example.json" />
+        <None Include="appsettings.Local.example.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="dbup-postgresql" Version="7.0.1" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
+        <PackageReference Include="Npgsql" Version="10.0.3" />
+    </ItemGroup>
+
+</Project>

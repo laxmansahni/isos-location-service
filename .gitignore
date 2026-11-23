@@ -1,0 +1,14 @@
+.vs/*
+.vs/*
+packages/*
+**/bin/
+**/debug/
+**/obj/
+Release/
+*.user
+.idea/
+
+.DS_Store
+
+# Local developer settings with credentials; copy appsettings.Local.example.json to this name
+appsettings.Local.json
