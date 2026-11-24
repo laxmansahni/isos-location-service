@@ -113,7 +113,7 @@ The idempotency index is unique on `(user_id, captured_at, point_id)`. PostgreSQ
 | `device_id` | string | Needed for ADR-008 |
 | `captured_at` | timestamptz | Device time in UTC |
 | `utc_offset_min` | smallint | Offset at capture for local-time rules (ADR-004) |
-| `received_at` | timestamptz | Server time; clock-skew check |
+| `received_at` | timestamptz | Server time when the batch arrived, never sent by the app. It is the "sent timestamp" of the Live Location Sharing stories, and the basis of the clock-skew check |
 | `latitude`, `longitude` | double | Range validated |
 | `accuracy_m` | real | |
 | `speed_mps`, `course_deg` | real, nullable | Shown only if present |
@@ -258,6 +258,8 @@ Error contract: `401`, `403 SHARING_NOT_ALLOWED`, `403 CONSENT_REQUIRED`, `403 H
 
 `GET /latest?clientId=&populationFilter=&types=LOCATION_SHARE&since=` returns only `LOCATION_SHARE` items with `userId`, `firstName`, `lastName`, `latitude`, `longitude`, `capturedAt`, `freshnessSeconds`. Names are joined from the user directory at read time. Supports ETag/`304` and a `since` cursor. Only users sharing now, or with a point newer than the freshness threshold, are returned. Results older than the fence are excluded.
 
+**Implemented** (`GET /v1/locationtracking/latest`): needs `MGRLOCHIS` (placeholder: the map's own permission is still an assumption, HLD 6). Returns `{ items, nextSince }` from `latest_location` where `shared = true` and `captured_at` is within `Query:LatestFreshness` (default 13 h: the 12 h heartbeat of the Significant-Change Location Capture story plus 1 h margin, the 13 h candidate in HLD v0.2; Product still has to confirm the map freshness target, HLD Q7/Q18, and it conflicts with Location Confidence's 30 min rule until C11 is settled; "sharing now" cannot be evaluated until policy exists). A person whose newest point is not shared is absent. `since` returns only points captured after it (pass the previous `nextSince`); a delta does not report people who dropped off, so a first load or reconnect without `since` is the authoritative snapshot. The `ETag` is a hash of the people shown and their point ids, and `If-None-Match` gets `304`. `types` is validated against `LOCATION_SHARE`, `CHECK_IN`, `AEC`; this layer returns nothing unless `LOCATION_SHARE` is included. `clientId` filters by tenant and is overridden by the caller's own client once that is resolved. **Not built:** `populationFilter` and population scope, `firstName`/`lastName` (returned as `null` until the user directory is wired in), "sharing now" from policy, and paging of very large snapshots.
+
 ### 4.4 History and replay
 
 - History: `GET /users/{id}/history?range=1h|24h|7d|14d&cursor=` — `LOCATION_SHARE` rows with type, lat/long, speed, course, accuracy, timestamp. Default `1h`. Ranges are capped at the client's `retention_days`.
@@ -265,6 +267,14 @@ Error contract: `401`, `403 SHARING_NOT_ALLOWED`, `403 CONSENT_REQUIRED`, `403 H
 - Authorisation: own profile needs `USRLOCHIS` and `allow_user_view_history`; another user needs `MGRLOCHIS` and the target in the manager's population scope. Empty result is `200` with `points: []`.
 - Large replays: pagination, optional Ramer–Douglas–Peucker thinning for map rendering; the table stays lossless.
 - Access audit entry per manager read of another user's data: who, whom, range, data type, time. No coordinates.
+
+**Implemented** (`GET /v1/locationtracking/users/{id}/history` and `/replay`, `{id}` is the party id):
+
+- **Query:** `range` is `1h` (default), `24h`, `7d` or `14d`, capped at `retention_days`; `cursor` is the opaque `nextCursor` of the previous page; `limit` defaults to 500 and is capped at 1000 (`Query:DefaultPageSize`, `Query:MaxPageSize`). Anything invalid is `400`.
+- **History** returns `{ userId, range, from, points, nextCursor }`, newest first, `LOCATION_SHARE` rows only (not-shared points are never in the history table). Keyset paging on `(captured_at, point_id)`.
+- **Replay** returns the same plus `partial` and `failedSources`, oldest first. Each `ITimelineSource` is read in parallel and merge-sorted by time, then by type (`AEC`, `CHECK_IN`, `LOCATION_SHARE`). The cursor carries time, type rank and id, so a page boundary inside a group of equal timestamps neither skips nor repeats items. A failing source is logged, named in `failedSources`, and the rest is returned. **Only the location share source exists**; check-ins and AECs belong to other services and plug in as further `ITimelineSource`s. RDP thinning is not built.
+- **Authorisation:** own data needs `USRLOCHIS`, another person's needs `MGRLOCHIS`; otherwise `403` with `code: HISTORY_NOT_PERMITTED`. **Not built:** the admin toggle `allow_user_view_history` and the manager's population scope, so any `MGRLOCHIS` holder can read any person for now. Development reads the codes from the `permissions` header; other environments return `401` until token validation exists.
+- **Audit:** a manager read of another person writes a row to `access_audit` (migration `0004`: time, actor, target, data type `HISTORY`/`REPLAY`, requested range; no coordinates) before any data is read, so if the audit write fails nothing is returned. Reading your own data is not audited. Every page request is audited. Retention and access rules for the audit table are not defined yet.
 
 ---
 

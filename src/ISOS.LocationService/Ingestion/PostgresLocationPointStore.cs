@@ -5,7 +5,7 @@ namespace ISOS.LocationService.Ingestion;
 
 public sealed class PostgresLocationPointStore(NpgsqlDataSource dataSource) : ILocationPointStore
 {
-    private const string Columns =
+    internal const string Columns =
         "point_id, party_id, client_id, device_id, captured_at, utc_offset_min, received_at, " +
         "latitude, longitude, accuracy_m, speed_mps, course_deg, altitude_m, quality_flags, shared, retention_expires_at";
 

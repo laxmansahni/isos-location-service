@@ -49,8 +49,11 @@ In Development the app listens on `http://localhost:5027` and serves the OpenAPI
 | Method | Path | Status |
 |---|---|---|
 | POST | `/v1/locationtracking/points` | Implemented (validation, idempotency, PostgreSQL storage) |
+| GET | `/v1/locationtracking/latest` | Implemented (shared, fresh points; ETag/`304`, `since`); no population scope or names yet |
+| GET | `/v1/locationtracking/users/{id}/history` | Implemented (ranges, cursor paging, access audit); no population scope yet |
+| GET | `/v1/locationtracking/users/{id}/replay` | Implemented for location shares only; check-in and AEC sources not wired |
 
-Try it locally. The `partyId` header is a Development-only placeholder for the authenticated person until token validation exists (HLD Q8); the client is not sent and will be resolved from the party on the server:
+Try it locally. The `partyId` header is a Development-only placeholder for the authenticated person until token validation exists (HLD Q8); the client is not sent and will be resolved from the party on the server. In the same way the Development-only `permissions` header carries the function codes (`MGRLOCHIS`, `USRLOCHIS`) that the token will carry later:
 
 ```sh
 curl -X POST http://localhost:5027/v1/locationtracking/points \
@@ -60,6 +63,16 @@ curl -X POST http://localhost:5027/v1/locationtracking/points \
 ```
 
 Use a recent `capturedAt`: points older than the retention window (14 days) are rejected. The full contract is in the [LLD](docs/live-location-sharing-lld.md#4-api).
+
+Read the data back (a manager looking at the person who sent the point above):
+
+```sh
+curl "http://localhost:5027/v1/locationtracking/users/IND_335dc59b-2b6a-4fa9-976f-d0c2b3d0647f/history?range=24h" \
+  -H "partyId: IND_manager" -H "permissions: MGRLOCHIS"
+curl http://localhost:5027/v1/locationtracking/latest -H "partyId: IND_manager" -H "permissions: MGRLOCHIS"
+```
+
+Reading your own data needs `USRLOCHIS`; reading someone else's needs `MGRLOCHIS` and writes an access-audit row (table `access_audit`, no coordinates). Only shared points are ever returned.
 
 **Required per point:** `pointId`, `capturedAt`, `latitude`, `longitude`, `accuracy` and `shared`. `shared` is `true` when live location sharing is on for the point and `false` when it was captured only for AEC or Location Based Alerts. It has no default: a point without it is rejected with `MISSING_FIELD`. A `shared=true` point is added to history and becomes the latest position. A `shared=false` point is never added to history; it only replaces the latest position (table `latest_location`) when its `capturedAt` is newer.
 

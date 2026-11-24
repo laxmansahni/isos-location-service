@@ -1,6 +1,8 @@
+using ISOS.LocationService.Audit;
 using ISOS.LocationService.Database;
 using ISOS.LocationService.Identity;
 using ISOS.LocationService.Ingestion;
+using ISOS.LocationService.Query;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,9 +18,12 @@ builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.Configure<IngestionOptions>(builder.Configuration.GetSection(IngestionOptions.SectionName));
+builder.Services.Configure<QueryOptions>(builder.Configuration.GetSection(QueryOptions.SectionName));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<PointValidator>();
 builder.Services.AddScoped<IngestionService>();
+builder.Services.AddScoped<ITimelineSource, LocationShareTimelineSource>();
+builder.Services.AddScoped<ReplayService>();
 
 // The connection string comes from user secrets or environment variables, never from a committed file.
 var connectionString = builder.Configuration.GetConnectionString("LocationDb");
@@ -34,13 +39,19 @@ if (usePostgres)
 {
     builder.Services.AddSingleton(NpgsqlDataSource.Create(connectionString!));
     builder.Services.AddSingleton<ILocationPointStore, PostgresLocationPointStore>();
+    builder.Services.AddSingleton<ILocationQueryStore, PostgresLocationQueryStore>();
+    builder.Services.AddSingleton<IAccessAuditStore, PostgresAccessAuditStore>();
     builder.Services.AddSingleton<PartitionMaintenance>();
     builder.Services.AddHostedService<PartitionMaintenanceService>();
 }
 else if (devShortcuts)
 {
     // Development and test convenience only: points are lost on restart.
-    builder.Services.AddSingleton<ILocationPointStore, InMemoryLocationPointStore>();
+    builder.Services.AddSingleton<InMemoryLocationPointStore>();
+    builder.Services.AddSingleton<ILocationPointStore>(sp => sp.GetRequiredService<InMemoryLocationPointStore>());
+    builder.Services.AddSingleton<ILocationQueryStore>(sp => sp.GetRequiredService<InMemoryLocationPointStore>());
+    builder.Services.AddSingleton<InMemoryAccessAuditStore>();
+    builder.Services.AddSingleton<IAccessAuditStore>(sp => sp.GetRequiredService<InMemoryAccessAuditStore>());
 }
 else
 {

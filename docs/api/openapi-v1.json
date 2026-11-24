@@ -5,6 +5,389 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/v1/locationtracking/latest": {
+      "get": {
+        "tags": [
+          "LocationQuery"
+        ],
+        "summary": "Latest shared position of each person, for the manager map.",
+        "description": "Needs the MGRLOCHIS function code. Returns only LOCATION_SHARE points that are shared and fresh; a person whose\nnewest point is not shared does not appear. Supports ETag with 304 and a `since` cursor for delta polling\n(LLD 4.3). Population scope and names from the user directory are not built yet.",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "query",
+            "description": "Limits the result to one client. Ignored when the caller's client is known.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "description": "Comma separated list of LOCATION_SHARE, CHECK_IN, AEC. Only LOCATION_SHARE is returned by this layer.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "Return only points captured after this time (use `nextSince` from the previous response).",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/locationtracking/users/{id}/history": {
+      "get": {
+        "tags": [
+          "LocationQuery"
+        ],
+        "summary": "A person's shared location history, newest first.",
+        "description": "Own history needs USRLOCHIS; another person's needs MGRLOCHIS (population scope is not enforced yet) and is\naudited. Only LOCATION_SHARE points are returned, never not-shared ones. An empty result is 200 with no points.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Party id of the person.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "description": "1h (default), 24h, 7d or 14d, capped at the retention window.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, capped by the server.",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/locationtracking/users/{id}/replay": {
+      "get": {
+        "tags": [
+          "LocationQuery"
+        ],
+        "summary": "A person's timeline: location shares merged with check-ins and AECs, oldest first.",
+        "description": "Same authorisation and audit as history. Sources are read in parallel; when one fails the others are still\nreturned with `partial: true` and the failed `failedSources`. Only the location share source exists\nso far; check-ins and AECs come from other services.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Party id of the person.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "description": "1h (default), 24h, 7d or 14d, capped at the retention window.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `nextCursor` of the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, capped by the server.",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/locationtracking/points": {
       "post": {
         "tags": [
@@ -131,6 +514,209 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "HistoryResponse": {
+        "required": [
+          "userId",
+          "range",
+          "from",
+          "points",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Party id of the person."
+          },
+          "range": {
+            "type": "string",
+            "description": "The requested range, one of 1h, 24h, 7d, 14d (capped at the retention window)."
+          },
+          "from": {
+            "type": "string",
+            "description": "Start of the window actually applied.",
+            "format": "date-time"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NormalizedPoint"
+            },
+            "description": "Newest first."
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Pass as `cursor` to get the next page. Null on the last page."
+          }
+        }
+      },
+      "LatestItem": {
+        "required": [
+          "userId",
+          "firstName",
+          "lastName",
+          "latitude",
+          "longitude",
+          "capturedAt",
+          "freshnessSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Party id."
+          },
+          "firstName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Null until the user directory is wired in."
+          },
+          "lastName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Null until the user directory is wired in."
+          },
+          "latitude": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "Degrees.",
+            "format": "double"
+          },
+          "longitude": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "Degrees.",
+            "format": "double"
+          },
+          "capturedAt": {
+            "type": "string",
+            "description": "When the device captured the point.",
+            "format": "date-time"
+          },
+          "freshnessSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Age of the point at the time of the request.",
+            "format": "int32"
+          }
+        }
+      },
+      "LatestResponse": {
+        "required": [
+          "items",
+          "nextSince"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LatestItem"
+            },
+            "description": "Newest first."
+          },
+          "nextSince": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Pass as `since` on the next poll to receive only newer points.",
+            "format": "date-time"
+          }
+        }
+      },
+      "NormalizedPoint": {
+        "required": [
+          "id",
+          "type",
+          "latitude",
+          "longitude",
+          "accuracyM",
+          "speedMps",
+          "courseDeg",
+          "timestamp"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Point id (a location share) or the source's own id."
+          },
+          "type": {
+            "type": "string",
+            "description": "One of TimelineTypes."
+          },
+          "latitude": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "Degrees.",
+            "format": "double"
+          },
+          "longitude": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "Degrees.",
+            "format": "double"
+          },
+          "accuracyM": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "Null when the source does not have it.",
+            "format": "double"
+          },
+          "speedMps": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "Null when unknown.",
+            "format": "double"
+          },
+          "courseDeg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "Degrees clockwise from true north. Null when unknown.",
+            "format": "double"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "When the point was captured.",
+            "format": "date-time"
           }
         }
       },
@@ -325,6 +911,58 @@
           }
         }
       },
+      "ReplayResponse": {
+        "required": [
+          "userId",
+          "range",
+          "from",
+          "points",
+          "partial",
+          "failedSources",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Party id of the person."
+          },
+          "range": {
+            "type": "string",
+            "description": "The requested range, one of 1h, 24h, 7d, 14d (capped at the retention window)."
+          },
+          "from": {
+            "type": "string",
+            "description": "Start of the window actually applied.",
+            "format": "date-time"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NormalizedPoint"
+            },
+            "description": "Oldest first."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "True when a source failed; the other sources are still returned."
+          },
+          "failedSources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of the sources that failed."
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Pass as `cursor` to get the next page. Null on the last page."
+          }
+        }
+      },
       "SubmitPointsRequest": {
         "required": [
           "points",
@@ -406,6 +1044,9 @@
     }
   },
   "tags": [
+    {
+      "name": "LocationQuery"
+    },
     {
       "name": "LocationTracking"
     }
