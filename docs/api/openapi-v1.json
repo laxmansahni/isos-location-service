@@ -132,7 +132,7 @@
           "LocationQuery"
         ],
         "summary": "A person's shared location history, newest first.",
-        "description": "Own history needs USRLOCHIS; another person's needs MGRLOCHIS (population scope is not enforced yet) and is\naudited. Only LOCATION_SHARE points are returned, never not-shared ones. An empty result is 200 with no points.",
+        "description": "Own history needs USRLOCHIS; another person's needs MGRLOCHIS (population scope is not enforced yet) and is\naudited. Only LOCATION_SHARE points are returned, never not-shared ones, and none captured before the person's\nvisibility fence (set when consent is revoked). An empty result is 200 with no points.",
         "parameters": [
           {
             "name": "id",
@@ -388,13 +388,489 @@
         }
       }
     },
+    "/v1/locationtracking/policy": {
+      "get": {
+        "tags": [
+          "Policy"
+        ],
+        "summary": "The effective policy for the caller: whether sharing is allowed now and what the device should do.",
+        "description": "The device refreshes this at foreground, login, token refresh, location wake-ups, the heartbeat and\n`nextEvaluationAt` (LLD 3.3). Supports ETag with 304.",
+        "parameters": [
+          {
+            "name": "tz",
+            "in": "query",
+            "description": "The device's IANA time zone. Used for schedule windows before the person's home zone.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/locationtracking/consent": {
+      "put": {
+        "tags": [
+          "Policy"
+        ],
+        "summary": "Grants or revokes consent to share live location.",
+        "description": "GRANTED needs the current disclosure version (see `disclosureVersion` in the policy) and a client that\nallows sharing. REVOKED takes effect at once (ADR-005): ingestion returns 403 CONSENT_REQUIRED, the person's\nearlier points stop being visible and their latest position is deleted. Repeating a request changes nothing.\nReturns the new policy.",
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/locationtracking/devices/{deviceId}/state": {
+      "put": {
+        "tags": [
+          "Policy"
+        ],
+        "summary": "Reports the phone's location permission and time zone for this device.",
+        "description": "The session is ACTIVE only with the ALWAYS permission and precise location on; otherwise it is\nSUSPENDED_OS_PERMISSION (ADR-005). Consent is not affected. Each call renews the sharing lease.",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "description": "The device id, the same as `device.id` on points.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceStateRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceStateRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceStateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceStateResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceStateResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceStateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/locationtracking/devices/{deviceId}/session": {
+      "delete": {
+        "tags": [
+          "Policy"
+        ],
+        "summary": "Ends this device's session (logout).",
+        "description": "Other devices are not affected (ADR-008). Safe to repeat. Returns 204.",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "description": "The device id.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/locationtracking/users/me/preference": {
+      "put": {
+        "tags": [
+          "Policy"
+        ],
+        "summary": "Sets the person's sharing type, home time zone and schedule.",
+        "description": "The type must be one the client offers. SCHEDULE needs at least one weekly window (local time, day 0 =\nSunday; an end before the start crosses midnight). The schedule is kept when another type is chosen, and a\nchange takes effect immediately. Returns the new policy.",
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/locationtracking/points": {
       "post": {
         "tags": [
           "LocationTracking"
         ],
         "summary": "Submits 1 to 100 location points from the Assistance App.",
-        "description": "Returns 200 with a per-point result. The device deletes points reported as Stored, Duplicate or\nRejected (LLD 4.1). A batch that is empty, too large or has no device id is rejected as a whole with 400.",
+        "description": "Returns 200 with a per-point result. The device deletes points reported as Stored, Duplicate or\nRejected (LLD 4.1). A batch that is empty, too large or has no device id is rejected as a whole with 400.\nLive-sharing points (`shared: true`) are checked against the person's policy: when the client has not\nenabled sharing, or the person has not consented, a batch of only live points gets 403 SHARING_NOT_ALLOWED or\nCONSENT_REQUIRED with the current policy. In a mixed batch those points are rejected one by one instead.\nA point captured before consent or the visibility fence, or outside the chosen sharing window, is rejected.\nNot-shared points (AEC and Location Based Alerts only) are never checked against sharing consent.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -475,6 +951,26 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -482,6 +978,29 @@
   },
   "components": {
     "schemas": {
+      "ConsentRequest": {
+        "required": [
+          "status",
+          "disclosureVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "GRANTED or REVOKED."
+          },
+          "disclosureVersion": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Required for GRANTED: the version of the disclosure the person accepted."
+          }
+        }
+      },
       "DeviceDto": {
         "required": [
           "id",
@@ -514,6 +1033,84 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "DeviceStateRequest": {
+        "required": [
+          "platform",
+          "osPermission",
+          "preciseLocation",
+          "timezone"
+        ],
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "ios or android."
+          },
+          "osPermission": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "ALWAYS, WHEN_IN_USE, DENIED or OFF."
+          },
+          "preciseLocation": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Whether precise location is on."
+          },
+          "timezone": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The device's IANA time zone."
+          }
+        }
+      },
+      "DeviceStateResponse": {
+        "required": [
+          "state",
+          "leaseExpiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "ACTIVE, or SUSPENDED_OS_PERMISSION when the OS permission is not enough to share."
+          },
+          "leaseExpiresAt": {
+            "type": "string",
+            "description": "When the sharing lease ends unless the device reports again.",
+            "format": "date-time"
+          }
+        }
+      },
+      "EventWindowDto": {
+        "required": [
+          "triggerType",
+          "startsAt",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "triggerType": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -873,6 +1470,141 @@
         ],
         "description": "Stored: accepted. Duplicate: the same point was already stored. Superseded: a not-shared point that is not newer\nthan the latest position, so it was dropped. Rejected: invalid. The device may delete a point in every status."
       },
+      "PolicyResponse": {
+        "required": [
+          "allowedNow",
+          "nextEvaluationAt",
+          "validUntil",
+          "consentRequired",
+          "disclosureVersion",
+          "clientId",
+          "etag",
+          "heartbeatSeconds",
+          "primaryType",
+          "schedule",
+          "eventWindow",
+          "sharingEnabled",
+          "enabledTypes"
+        ],
+        "type": "object",
+        "properties": {
+          "allowedNow": {
+            "type": "boolean",
+            "description": "Whether the device may capture and send live-sharing points right now."
+          },
+          "nextEvaluationAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the answer may change by itself (a window opening or closing). The device asks again then.",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The device must stop sharing when this passes unless it has refreshed the policy. Null when not allowed.",
+            "format": "date-time"
+          },
+          "consentRequired": {
+            "type": "boolean",
+            "description": "True when the client allows sharing but the person has not agreed to the current disclosure."
+          },
+          "disclosureVersion": {
+            "type": "string",
+            "description": "The disclosure version the person must have seen. Send it with the consent."
+          },
+          "clientId": {
+            "type": "string",
+            "description": "The client this policy is for."
+          },
+          "etag": {
+            "type": "string",
+            "description": "Changes whenever the policy changes. Also sent as the ETag header; use it with If-None-Match."
+          },
+          "heartbeatSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How often a stationary device sends a point.",
+            "format": "int32"
+          },
+          "primaryType": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The type the person chose (ALWAYS, SCHEDULE, ACTIVE_TRAVEL), or null."
+          },
+          "schedule": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScheduleWindowDto"
+            },
+            "description": "The person's weekly windows in their local time, so the device can follow them offline."
+          },
+          "eventWindow": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The event window (for example after an AEC) that is open now, or null.",
+                "$ref": "#/components/schemas/EventWindowDto"
+              }
+            ]
+          },
+          "sharingEnabled": {
+            "type": "boolean",
+            "description": "Whether the client allows live sharing at all."
+          },
+          "enabledTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The types the client offers. Empty when sharing is not enabled."
+          }
+        }
+      },
+      "PreferenceRequest": {
+        "required": [
+          "primaryType",
+          "homeTimezone",
+          "schedule"
+        ],
+        "type": "object",
+        "properties": {
+          "primaryType": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "ALWAYS, SCHEDULE or ACTIVE_TRAVEL. Must be one the client offers."
+          },
+          "homeTimezone": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Optional IANA zone used when the device does not report one."
+          },
+          "schedule": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ScheduleWindowDto"
+            },
+            "description": "Weekly windows. At least one is required for SCHEDULE. Kept when another type is chosen."
+          }
+        }
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -963,6 +1695,40 @@
           }
         }
       },
+      "ScheduleWindowDto": {
+        "required": [
+          "dayOfWeek",
+          "startTime",
+          "endTime"
+        ],
+        "type": "object",
+        "properties": {
+          "dayOfWeek": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "0 = Sunday ... 6 = Saturday.",
+            "format": "int32"
+          },
+          "startTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Local time, HH:mm."
+          },
+          "endTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Local time, HH:mm. Before the start time means the window runs past midnight."
+          }
+        }
+      },
       "SubmitPointsRequest": {
         "required": [
           "points",
@@ -1046,6 +1812,9 @@
   "tags": [
     {
       "name": "LocationQuery"
+    },
+    {
+      "name": "Policy"
     },
     {
       "name": "LocationTracking"

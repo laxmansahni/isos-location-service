@@ -3,6 +3,7 @@ using System.Text;
 using ISOS.LocationService.Audit;
 using ISOS.LocationService.Identity;
 using ISOS.LocationService.Ingestion;
+using ISOS.LocationService.Policy;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -13,6 +14,7 @@ namespace ISOS.LocationService.Query;
 public sealed class LocationQueryController(
     ICallerContext callerContext,
     ILocationQueryStore store,
+    IPolicyStore policyStore,
     ReplayService replay,
     IAccessAuditStore audit,
     IOptions<IngestionOptions> ingestionOptions,
@@ -81,7 +83,8 @@ public sealed class LocationQueryController(
     /// <summary>A person's shared location history, newest first.</summary>
     /// <remarks>
     /// Own history needs USRLOCHIS; another person's needs MGRLOCHIS (population scope is not enforced yet) and is
-    /// audited. Only LOCATION_SHARE points are returned, never not-shared ones. An empty result is 200 with no points.
+    /// audited. Only LOCATION_SHARE points are returned, never not-shared ones, and none captured before the person's
+    /// visibility fence (set when consent is revoked). An empty result is 200 with no points.
     /// </remarks>
     /// <param name="id">Party id of the person.</param>
     /// <param name="range">1h (default), 24h, 7d or 14d, capped at the retention window.</param>
@@ -109,11 +112,12 @@ public sealed class LocationQueryController(
 
         await AuditIfOtherPersonAsync(caller, id, "HISTORY", query.RangeName, cancellationToken);
 
+        var from = await ApplyFenceAsync(id, caller, query.From, cancellationToken);
         var rows = await store.GetHistoryAsync(
-            new HistoryQuery(id, query.From, after, NewestFirst: true, query.Limit + 1), cancellationToken);
+            new HistoryQuery(id, from, after, NewestFirst: true, query.Limit + 1), cancellationToken);
         var page = rows.Take(query.Limit).Select(LocationShareMapping.ToNormalized).ToList();
         var next = rows.Count > query.Limit ? PageCursor.After(page[^1]).Encode() : null;
-        return Ok(new HistoryResponse(id, query.RangeName, query.From, page, next));
+        return Ok(new HistoryResponse(id, query.RangeName, from, page, next));
     }
 
     /// <summary>A person's timeline: location shares merged with check-ins and AECs, oldest first.</summary>
@@ -147,9 +151,17 @@ public sealed class LocationQueryController(
 
         await AuditIfOtherPersonAsync(caller, id, "REPLAY", query.RangeName, cancellationToken);
 
-        var result = await replay.ReadAsync(id, query.From, query.After, query.Limit, cancellationToken);
+        var from = await ApplyFenceAsync(id, caller, query.From, cancellationToken);
+        var result = await replay.ReadAsync(id, from, query.After, query.Limit, cancellationToken);
         return Ok(new ReplayResponse(
-            id, query.RangeName, query.From, result.Points, result.FailedSources.Count > 0, result.FailedSources, result.Next?.Encode()));
+            id, query.RangeName, from, result.Points, result.FailedSources.Count > 0, result.FailedSources, result.Next?.Encode()));
+    }
+
+    // Points captured at or before the visibility fence (revoked consent, ADR-005) are never shown again.
+    private async Task<DateTimeOffset> ApplyFenceAsync(string targetPartyId, CallerIdentity caller, DateTimeOffset from, CancellationToken cancellationToken)
+    {
+        var fence = await policyStore.GetFenceAsync(targetPartyId, caller.ClientId, cancellationToken);
+        return fence is { } f && f > from ? f : from;
     }
 
     private const string InvalidQueryDetail = "range must be 1h, 24h, 7d or 14d; cursor must be one returned by this API; limit must be positive.";

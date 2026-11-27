@@ -20,6 +20,18 @@ public sealed class InMemoryLocationPointStore : ILocationPointStore, ILocationQ
         lock (_gate) { return _latest.GetValueOrDefault(partyId); }
     }
 
+    /// <summary>Deletes the person's latest position when it is a live-sharing one (revoked consent, ADR-005).</summary>
+    public void RemoveSharedLatest(string partyId)
+    {
+        lock (_gate)
+        {
+            if (_latest.TryGetValue(partyId, out var current) && current.Shared)
+            {
+                _latest.Remove(partyId);
+            }
+        }
+    }
+
     public Task<StoreOutcome> StoreAsync(LocationPoint point, CancellationToken cancellationToken)
     {
         lock (_gate)

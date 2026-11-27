@@ -17,7 +17,7 @@ public class LocationQueryEndpointTests : IClassFixture<WebApplicationFactory<Pr
     private readonly WebApplicationFactory<Program> _factory;
 
     public LocationQueryEndpointTests(WebApplicationFactory<Program> factory) =>
-        _factory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        _factory = SharingTestSetup.Configure(factory);
 
     private static string NewParty() => $"IND_{Guid.NewGuid()}";
 
@@ -52,8 +52,10 @@ public class LocationQueryEndpointTests : IClassFixture<WebApplicationFactory<Pr
             },
             device = new { id = "device-1", platform = "ios" },
         };
+        await SharingTestSetup.EnableAsync(_factory.Services, partyId);
         var request = new HttpRequestMessage(HttpMethod.Post, $"{Base}/points") { Content = JsonContent.Create(body) };
         request.Headers.Add(DevelopmentHeaderCallerContext.PartyIdHeader, partyId);
+        request.Headers.Add(DevelopmentHeaderCallerContext.ClientIdHeader, SharingTestSetup.ClientId);
         var response = await _factory.CreateClient().SendAsync(request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

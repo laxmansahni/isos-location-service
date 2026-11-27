@@ -1,18 +1,26 @@
 using ISOS.LocationService.Identity;
+using ISOS.LocationService.Policy;
 using Microsoft.Extensions.Options;
 
 namespace ISOS.LocationService.Ingestion;
 
 public sealed class IngestionService(
     PointValidator validator,
+    PolicyEvaluator policyEvaluator,
     ILocationPointStore store,
     IOptions<IngestionOptions> options,
     TimeProvider clock)
 {
+    /// <summary>
+    /// Validates and stores each point. With a <paramref name="policy"/>, live-sharing points (<c>shared = true</c>)
+    /// are also checked against it one by one; not-shared points never are, because they are not live sharing
+    /// (LLD 2.3). The policy may be null when the batch has no live points.
+    /// </summary>
     public async Task<SubmitPointsResponse> SubmitAsync(
         CallerIdentity caller,
         DeviceDto device,
         IReadOnlyList<PointDto> points,
+        PolicySnapshot? policy,
         CancellationToken cancellationToken)
     {
         var receivedAt = clock.GetUtcNow();
@@ -28,6 +36,14 @@ public sealed class IngestionService(
             {
                 rejected++;
                 results.Add(new PointResult(point.PointId, PointStatus.Rejected, reason));
+                continue;
+            }
+
+            if (point.Shared == true && policy is not null
+                && policyEvaluator.Evaluate(policy, point.CapturedAt!.Value, point.UtcOffsetMinutes, device.Timezone) is { Allowed: false } denied)
+            {
+                rejected++;
+                results.Add(new PointResult(point.PointId, PointStatus.Rejected, denied.Reason));
                 continue;
             }
 

@@ -32,12 +32,14 @@ public interface ICallerContext
 /// <summary>
 /// Placeholder until token validation is built (HLD Q8). Reads the party id from the "partyId" header and is
 /// registered in Development only. In any other environment every call is unauthenticated.
-/// The client is not sent: it will be resolved from the party id on the server. The optional "permissions" header
-/// (comma separated function codes) stands in for the codes that will come from the token.
+/// The client is not sent in production: it will be resolved from the party id on the server. Until then the
+/// optional "clientId" header stands in for it, and the optional "permissions" header (comma separated function
+/// codes) for the codes that will come from the token.
 /// </summary>
 public sealed class DevelopmentHeaderCallerContext(IHttpContextAccessor accessor) : ICallerContext
 {
     public const string PartyIdHeader = "partyId";
+    public const string ClientIdHeader = "clientId";
     public const string PermissionsHeader = "permissions";
     public const int MaxPartyIdLength = 100;
 
@@ -55,7 +57,11 @@ public sealed class DevelopmentHeaderCallerContext(IHttpContextAccessor accessor
             var permissions = headers![PermissionsHeader].ToString()
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            return new CallerIdentity(partyId, Permissions: permissions);
+            var clientId = headers[ClientIdHeader].ToString().Trim();
+            return new CallerIdentity(
+                partyId,
+                string.IsNullOrEmpty(clientId) || clientId.Length > MaxPartyIdLength ? null : clientId,
+                permissions);
         }
     }
 }

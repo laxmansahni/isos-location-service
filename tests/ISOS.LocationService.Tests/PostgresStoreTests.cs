@@ -318,6 +318,7 @@ public class PostgresEndpointTests : IClassFixture<PostgresFixture>
             builder.UseEnvironment("Testing");
             builder.UseSetting("ConnectionStrings:LocationDb", postgres.ConnectionString);
             builder.UseSetting("Database:RunMigrationsOnStartup", "true");
+            builder.UseSetting("Policy:DefaultClient:SharingEnabled", "true");
         });
     }
 
@@ -325,6 +326,7 @@ public class PostgresEndpointTests : IClassFixture<PostgresFixture>
     public async Task Endpoint_persists_points_and_reports_a_retry_as_duplicate()
     {
         var client = _factory.CreateClient();
+        await SharingTestSetup.EnableAsync(_factory.Services, "IND_335dc59b-2b6a-4fa9-976f-d0c2b3d0647f");
         var pointId = Guid.NewGuid();
         var body = new
         {
@@ -350,6 +352,7 @@ public class PostgresEndpointTests : IClassFixture<PostgresFixture>
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "/v1/locationtracking/points") { Content = JsonContent.Create(body) };
             request.Headers.Add(DevelopmentHeaderCallerContext.PartyIdHeader, "IND_335dc59b-2b6a-4fa9-976f-d0c2b3d0647f");
+            request.Headers.Add(DevelopmentHeaderCallerContext.ClientIdHeader, SharingTestSetup.ClientId);
             var response = await client.SendAsync(request);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             return await response.Content.ReadFromJsonAsync<JsonElement>();

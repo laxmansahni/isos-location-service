@@ -16,12 +16,16 @@ public class LocationTrackingEndpointTests : IClassFixture<WebApplicationFactory
 
     private readonly WebApplicationFactory<Program> _factory;
 
-    public LocationTrackingEndpointTests(WebApplicationFactory<Program> factory) =>
-        _factory = factory.WithWebHostBuilder(builder =>
-        {
-            // "Testing" loads neither user secrets nor appsettings.Local.json, and uses the in-memory store.
-            builder.UseEnvironment("Testing");
-        });
+    public LocationTrackingEndpointTests(WebApplicationFactory<Program> factory)
+    {
+        _factory = SharingTestSetup.Configure(factory);
+        Seed(PartyA);
+        Seed(PartyB);
+    }
+
+    // Live points need consent and a chosen type. The in-memory store completes synchronously.
+    private void Seed(string partyId) =>
+        SharingTestSetup.EnableAsync(_factory.Services, partyId).GetAwaiter().GetResult();
 
     private static object Point(Guid? pointId = null, DateTimeOffset? capturedAt = null, double latitude = 51.5074) => new
     {
@@ -48,6 +52,7 @@ public class LocationTrackingEndpointTests : IClassFixture<WebApplicationFactory
         if (partyId is not null)
         {
             request.Headers.Add(DevelopmentHeaderCallerContext.PartyIdHeader, partyId);
+            request.Headers.Add(DevelopmentHeaderCallerContext.ClientIdHeader, SharingTestSetup.ClientId);
         }
 
         return request;
@@ -142,6 +147,7 @@ public class LocationTrackingEndpointTests : IClassFixture<WebApplicationFactory
     public async Task Party_id_with_a_prefix_is_accepted_as_is()
     {
         var client = _factory.CreateClient();
+        Seed("IND_92664bb1-eabf-4c47-af84-08f1cdb7a8f8");
 
         var response = await client.SendAsync(Request(Body(Point()), "IND_92664bb1-eabf-4c47-af84-08f1cdb7a8f8"));
 
@@ -233,6 +239,7 @@ public class LocationTrackingEndpointTests : IClassFixture<WebApplicationFactory
     {
         var client = _factory.CreateClient();
         const string party = "IND_mixed-batch";
+        Seed(party);
         var now = DateTimeOffset.UtcNow;
         var latest = NotSharedPoint(Guid.NewGuid(), now.AddMinutes(-2));
         var older = NotSharedPoint(Guid.NewGuid(), now.AddMinutes(-9));

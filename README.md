@@ -49,20 +49,37 @@ In Development the app listens on `http://localhost:5027` and serves the OpenAPI
 | Method | Path | Status |
 |---|---|---|
 | POST | `/v1/locationtracking/points` | Implemented (validation, idempotency, PostgreSQL storage) |
+| GET | `/v1/locationtracking/policy` | Implemented (effective policy, ETag/`304`) |
+| PUT | `/v1/locationtracking/consent` | Implemented (grant, revoke with visibility fence) |
+| PUT | `/v1/locationtracking/devices/{deviceId}/state` | Implemented (OS permission, time zone, lease) |
+| DELETE | `/v1/locationtracking/devices/{deviceId}/session` | Implemented (logout) |
+| PUT | `/v1/locationtracking/users/me/preference` | Implemented (type, schedule, home zone) |
 | GET | `/v1/locationtracking/latest` | Implemented (shared, fresh points; ETag/`304`, `since`); no population scope or names yet |
 | GET | `/v1/locationtracking/users/{id}/history` | Implemented (ranges, cursor paging, access audit); no population scope yet |
 | GET | `/v1/locationtracking/users/{id}/replay` | Implemented for location shares only; check-in and AEC sources not wired |
 
-Try it locally. The `partyId` header is a Development-only placeholder for the authenticated person until token validation exists (HLD Q8); the client is not sent and will be resolved from the party on the server. In the same way the Development-only `permissions` header carries the function codes (`MGRLOCHIS`, `USRLOCHIS`) that the token will carry later:
+Try it locally. The `partyId` header is a Development-only placeholder for the authenticated person until token validation exists (HLD Q8). The client will be resolved from the party on the server; until then the Development-only `clientId` header names it, and it is needed for everything except not-shared points. In the same way the Development-only `permissions` header carries the function codes (`MGRLOCHIS`, `USRLOCHIS`) that the token will carry later.
+
+Live sharing needs a consent and a chosen type before points are accepted, so a first run is three calls (a client without a row in `client_location_policy` uses `Policy:DefaultClient`, which `appsettings.Development.json` turns on):
+
+```sh
+H='-H partyId:IND_335dc59b-2b6a-4fa9-976f-d0c2b3d0647f -H clientId:client-1 -H Content-Type:application/json'
+curl -X PUT http://localhost:5027/v1/locationtracking/consent $H -d '{"status":"GRANTED","disclosureVersion":"1"}'
+curl -X PUT http://localhost:5027/v1/locationtracking/users/me/preference $H -d '{"primaryType":"ALWAYS"}'
+curl http://localhost:5027/v1/locationtracking/policy $H
+```
+
+Then send a point:
 
 ```sh
 curl -X POST http://localhost:5027/v1/locationtracking/points \
   -H "Content-Type: application/json" \
   -H "partyId: IND_335dc59b-2b6a-4fa9-976f-d0c2b3d0647f" \
+  -H "clientId: client-1" \
   -d '{"points":[{"pointId":"7f1c0000-0000-0000-0000-000000000001","capturedAt":"2026-11-19T09:00:00Z","latitude":51.5074,"longitude":-0.1276,"accuracy":12.5,"shared":true}],"device":{"id":"device-1","platform":"ios"}}'
 ```
 
-Use a recent `capturedAt`: points older than the retention window (14 days) are rejected. The full contract is in the [LLD](docs/live-location-sharing-lld.md#4-api).
+Use a recent `capturedAt`: points older than the retention window (14 days) are rejected, and so is a live point captured before you granted consent (`CAPTURED_BEFORE_CONSENT`), so replace the date above with a time just after the consent call. The full contract is in the [LLD](docs/live-location-sharing-lld.md#4-api).
 
 Read the data back (a manager looking at the person who sent the point above):
 

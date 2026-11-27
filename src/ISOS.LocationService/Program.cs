@@ -2,6 +2,7 @@ using ISOS.LocationService.Audit;
 using ISOS.LocationService.Database;
 using ISOS.LocationService.Identity;
 using ISOS.LocationService.Ingestion;
+using ISOS.LocationService.Policy;
 using ISOS.LocationService.Query;
 using Npgsql;
 
@@ -19,8 +20,11 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.Configure<IngestionOptions>(builder.Configuration.GetSection(IngestionOptions.SectionName));
 builder.Services.Configure<QueryOptions>(builder.Configuration.GetSection(QueryOptions.SectionName));
+builder.Services.Configure<PolicyOptions>(builder.Configuration.GetSection(PolicyOptions.SectionName));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<PointValidator>();
+builder.Services.AddSingleton<PolicyEvaluator>();
+builder.Services.AddScoped<PolicyService>();
 builder.Services.AddScoped<IngestionService>();
 builder.Services.AddScoped<ITimelineSource, LocationShareTimelineSource>();
 builder.Services.AddScoped<ReplayService>();
@@ -41,6 +45,7 @@ if (usePostgres)
     builder.Services.AddSingleton<ILocationPointStore, PostgresLocationPointStore>();
     builder.Services.AddSingleton<ILocationQueryStore, PostgresLocationQueryStore>();
     builder.Services.AddSingleton<IAccessAuditStore, PostgresAccessAuditStore>();
+    builder.Services.AddSingleton<IPolicyStore, PostgresPolicyStore>();
     builder.Services.AddSingleton<PartitionMaintenance>();
     builder.Services.AddHostedService<PartitionMaintenanceService>();
 }
@@ -52,6 +57,8 @@ else if (devShortcuts)
     builder.Services.AddSingleton<ILocationQueryStore>(sp => sp.GetRequiredService<InMemoryLocationPointStore>());
     builder.Services.AddSingleton<InMemoryAccessAuditStore>();
     builder.Services.AddSingleton<IAccessAuditStore>(sp => sp.GetRequiredService<InMemoryAccessAuditStore>());
+    builder.Services.AddSingleton<InMemoryPolicyStore>();
+    builder.Services.AddSingleton<IPolicyStore>(sp => sp.GetRequiredService<InMemoryPolicyStore>());
 }
 else
 {
