@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ISOS.LocationService\ISOS.LocationService.csproj" />
+    <ProjectReference Include="..\..\src\ISOS.LocationService.Purge\ISOS.LocationService.Purge.csproj" />
   </ItemGroup>
 
 </Project>

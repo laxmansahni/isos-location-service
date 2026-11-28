@@ -25,11 +25,12 @@ Tracking: epic SX-76, story SUB-5675.
 ```
 ISOS.LocationService.sln
 src/ISOS.LocationService/   ASP.NET Core Web API (net10.0, controllers, OpenAPI)
-tests/ISOS.LocationService.Tests/   xUnit unit and endpoint tests
+src/ISOS.LocationService.Purge/   Purge job: a console app that runs once and exits
+tests/ISOS.LocationService.Tests/   xUnit unit, endpoint and PostgreSQL tests
 docs/                       Architecture documents
 ```
 
-The target design is one deployable with three modules (ingestion, policy, query) and a separate purge job. A worker project for the purge job will be added when it is built.
+The target design is one deployable with three modules (ingestion, policy, query) and a separate purge job (`ISOS.LocationService.Purge`).
 
 ## Getting started
 
@@ -119,6 +120,22 @@ Alternatives that also work: `dotnet user-secrets set "ConnectionStrings:Locatio
 If no connection string is set, Development falls back to an in-memory store (data is lost on restart) and logs a warning; `"Database": { "UseInMemory": true }` in the local file forces this even when a connection string exists. Any other environment refuses to start without a connection string.
 
 The automated tests run in a separate `Testing` environment that ignores your local file and user secrets. They start their own disposable PostgreSQL 18 containers through Docker, so Docker must be running for `dotnet test`.
+
+### Purge job
+
+`ISOS.LocationService.Purge` enforces retention (LLD 5.3). One run deletes data captured before a revoked consent's or a disabled client's fence, deletes rows past `retention_expires_at`, drops old empty history partitions, and records the outcome in table `purge_run`. It runs once and exits with `0` (done, or another run was already going) or `1` (failed), so a daily schedule just starts it. It needs the migrations applied first (start the API once in Development, or run them as your deployment step).
+
+```sh
+dotnet run --project src/ISOS.LocationService.Purge
+```
+
+In Development it reads the same `appsettings.Local.json` as the API, so no second password file is needed; elsewhere it uses the `ConnectionStrings__LocationDb` environment variable. Settings (section `Purge`): `BatchSize` (10,000 rows per delete) and `PartitionLockTimeout` (5 s). It uses `Ingestion:RetentionDays` when that is set, so keep one value for both. Check what it did:
+
+```sh
+docker exec -it locationdb psql -U postgres -d locationdb -c "SELECT started_at, status, expired_history_rows, fenced_history_rows, expired_latest_rows, fenced_latest_rows, cardinality(dropped_partitions) AS dropped FROM purge_run ORDER BY started_at DESC LIMIT 5;"
+```
+
+It deletes real rows, so on a shared database run it deliberately.
 
 - Local data is synthetic only. Never copy production location data to a laptop.
 - Do not commit credentials or connection strings.

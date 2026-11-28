@@ -23,7 +23,7 @@ public sealed class PartitionMaintenance(NpgsqlDataSource dataSource, IOptions<I
     }
 }
 
-/// <summary>Keeps tomorrow's partition ready. Purging expired partitions is separate work (purge job).</summary>
+/// <summary>Keeps tomorrow's partition ready. Purging expired data is the separate purge job (ISOS.LocationService.Purge).</summary>
 public sealed class PartitionMaintenanceService(PartitionMaintenance maintenance, ILogger<PartitionMaintenanceService> logger)
     : BackgroundService
 {

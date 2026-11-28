@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <!-- Same id as the API, so `dotnet user-secrets` set for one applies to the other. -->
+        <UserSecretsId>b35e1638-4253-4bc0-9c67-f393abfaf993</UserSecretsId>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);1591</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.*" />
+        <PackageReference Include="Npgsql" Version="10.0.3" />
+    </ItemGroup>
+
+</Project>

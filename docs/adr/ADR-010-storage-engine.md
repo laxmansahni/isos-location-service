@@ -50,7 +50,7 @@ Detail (partitioning, idempotency index) is in [LLD 2.2 and 2.5](../live-locatio
 - The LLD's engine mapping for SQL Server is no longer needed and is removed.
 - Partition creation and retirement are our job (scheduled), as is purge evidence; backups fall under the erasure question (Platform, HLD Q13).
 - Data access uses Npgsql with plain SQL, and migrations are plain SQL scripts embedded in the service and run by DbUp (ADR-011). The first migration (`0001_create_location_history.sql`) creates the partitioned history table and a function that creates daily partitions.
-- The service creates partitions for 15 days back to 7 days ahead at startup and every 6 hours. Purging expired partitions is separate work (the purge job).
+- The service creates partitions for 15 days back to 7 days ahead at startup and every 6 hours. Purging expired data is the separate purge job (`ISOS.LocationService.Purge`, LLD 5.3).
 
 ## Open items
 
